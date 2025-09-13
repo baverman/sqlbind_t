@@ -17,8 +17,10 @@ from ast import (
     parse,
 )
 from importlib.machinery import PathFinder
-from typing import List
+from typing import Any, List, Union
 
+from . import SQL, AnySQL
+from . import sql as sql_orig
 from .template import Template
 
 PREFIX = '!! '
@@ -87,10 +89,18 @@ def check_template(arg: str) -> Template:
 t = check_template
 
 
+def sql(template: Union[AnySQL, str]) -> SQL:
+    return sql_orig(check_template(template))  # type: ignore[arg-type]
+
+
 class TransformingLoader(importlib.abc.SourceLoader):
-    def __init__(self, fullname: str, path: str) -> None:
+    def __init__(
+        self, fullname: str, path: str, *, rewrite_pytest: bool = False, pytest_hook: Any = None
+    ) -> None:
         self.fullname = fullname
         self.path = path
+        self._rewrite_pytest = rewrite_pytest
+        self._pytest_hook = pytest_hook
 
     def get_filename(self, fullname: str) -> str:
         return self.path
@@ -102,21 +112,46 @@ class TransformingLoader(importlib.abc.SourceLoader):
     def source_to_code(self, data, path, *, _optimize=-1):  # type: ignore[no-untyped-def,override]
         tree = parse(data, filename=path)
         new_tree = transform_fstrings(tree)
-        return compile(new_tree, path, 'exec', optimize=_optimize)
+        if self._rewrite_pytest:
+            from _pytest.assertion.rewrite import rewrite_asserts
+
+            rewrite_asserts(new_tree, data, path, self._pytest_hook.config)
+        return compile(new_tree, path, 'exec', optimize=_optimize, dont_inherit=True)
+
+
+class DummyState:
+    @staticmethod
+    def trace(*args, **kwargs):  # type: ignore[no-untyped-def]
+        pass
 
 
 class TransformingFinder(PathFinder):
-    def __init__(self, prefixes: List[str]) -> None:
+    def __init__(self, prefixes: List[str], *, pytest_hook: Any = None) -> None:
         self._sqlbind_prefixes = prefixes
+        self._pytest_hook = pytest_hook
 
     def find_spec(self, fullname, path, target=None):  # type: ignore[no-untyped-def,override]
         spec = super().find_spec(fullname, path, target=target)
         if any(fullname.startswith(it) for it in self._sqlbind_prefixes):
             if spec and spec.origin and spec.origin.endswith('.py'):
-                spec.loader = TransformingLoader(fullname, spec.origin)
+                rewrite_pytest = self._pytest_hook and self._pytest_hook._should_rewrite(
+                    fullname, spec.origin, DummyState
+                )
+                spec.loader = TransformingLoader(
+                    fullname,
+                    spec.origin,
+                    rewrite_pytest=rewrite_pytest,
+                    pytest_hook=self._pytest_hook,
+                )
                 return spec
         return spec
 
 
-def init(prefixes: List[str]) -> None:
-    sys.meta_path.insert(0, TransformingFinder(prefixes))
+def init(prefixes: List[str], pytest: bool = False) -> None:
+    pytest_hook = None
+    if pytest:
+        from _pytest.assertion.rewrite import AssertionRewritingHook
+
+        pytest_hook = next(it for it in sys.meta_path if isinstance(it, AssertionRewritingHook))
+
+    sys.meta_path.insert(0, TransformingFinder(prefixes, pytest_hook=pytest_hook))

@@ -1,9 +1,18 @@
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 
+from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, Template
 
 UNDEFINED = object()
-
 
 Part = Union[str, Interpolation]
 AnySQL = Union['SQL', Template]
@@ -30,6 +39,30 @@ class SQL(Template):
 
     def __bool__(self) -> bool:
         return bool(len(self._parts))
+
+    @overload
+    def split(self) -> Tuple[str, QMarkQueryParams]: ...
+
+    @overload
+    def split(self, params: ParamsT) -> Tuple[str, ParamsT]: ...
+
+    def split(self, params: Optional[ParamsT] = None) -> Tuple[str, ParamsT]:
+        lparams: ParamsT
+        if params is None:
+            lparams = QMarkQueryParams()  # type: ignore[assignment]
+        else:
+            lparams = params
+        return ''.join(self._walk(self, lparams)), lparams
+
+    def _walk(self, query: AnySQL, params: QueryParams) -> Iterator[str]:
+        for it in query:
+            if type(it) is str:
+                yield it
+            else:
+                if isinstance(it.value, Template):  # type: ignore[union-attr]
+                    yield from self._walk(it.value, params)  # type: ignore[union-attr]
+                else:
+                    yield params.compile(it.value)  # type: ignore[union-attr]
 
 
 class Compound(SQL):
@@ -161,27 +194,3 @@ def in_range(field: str, left: object, right: object) -> SQL:
 
 def in_crange(field: str, left: object, right: object) -> SQL:
     return _in_range(field, '>=', left, '<=', right)
-
-
-class ListQueryParams:
-    mark: str
-
-    def render(self, sql: AnySQL) -> Tuple[str, List[object]]:
-        params: List[object] = []
-        return ''.join(self.iter(sql, params)), params
-
-    def iter(self, sql: AnySQL, params: List[object]) -> Iterator[str]:
-        mark = self.mark
-        for it in sql:
-            if type(it) is str:
-                yield it
-            else:
-                if isinstance(it.value, Template):  # type: ignore[union-attr]
-                    yield from self.iter(it.value, params)  # type: ignore[union-attr]
-                else:
-                    yield mark
-                    params.append(it.value)  # type: ignore[union-attr]
-
-
-class QMarkQueryParams(ListQueryParams):
-    mark = '?'

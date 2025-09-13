@@ -1,12 +1,9 @@
-from typing import Any
-
 from sqlbind_t import (
     EMPTY,
     SET,
     VALUES,
     WHERE,
-    AnySQL,
-    QMarkQueryParams,
+    in_crange,
     in_range,
     not_none,
     sql,
@@ -14,11 +11,7 @@ from sqlbind_t import (
 )
 from sqlbind_t.template import Interpolation
 from sqlbind_t.template import t as tt
-from sqlbind_t.tfstring import t
-
-
-def render(q: AnySQL) -> tuple[str, list[Any]]:
-    return QMarkQueryParams().render(q)
+from sqlbind_t.tfstring import t, sql as sqlf
 
 
 def test_repr():
@@ -27,49 +20,50 @@ def test_repr():
 
 
 def test_simple():
-    s, p = render(tt('SELECT * from {text("boo")} WHERE name = {10}'))
+    s, p = sql(tt('SELECT * from {text("boo")} WHERE name = {10}')).split()
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 
 
 def test_simple_tf_strings():
-    s, p = render(t(f'!! SELECT * from {text("boo")} WHERE name = {10}'))
+    s, p = sqlf(f'!! SELECT * from {text("boo")} WHERE name = {10}').split()
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 
 
 def test_where():
     q = WHERE(some=not_none / 10, null=None, empty=not_none / None)
-    assert render(q) == ('WHERE some = ? AND null IS NULL', [10])
+    assert q.split() == ('WHERE some = ? AND null IS NULL', [10])
 
-    assert render(WHERE(EMPTY)) == ('', [])
+    assert sql(WHERE(EMPTY)).split() == ('', [])
 
 
 def test_in_range():
-    assert render(in_range('col', 10, 20)) == ('(col >= ? AND col < ?)', [10, 20])
-    assert render(in_range('col', 10, None)) == ('col >= ?', [10])
-    assert render(in_range('col', None, 20)) == ('col < ?', [20])
-    assert render(in_range('col', None, None)) == ('', [])
+    assert in_range('col', 10, 20).split() == ('(col >= ? AND col < ?)', [10, 20])
+    assert in_range('col', 10, None).split() == ('col >= ?', [10])
+    assert in_range('col', None, 20).split() == ('col < ?', [20])
+    assert in_range('col', None, None).split() == ('', [])
+    assert in_crange('col', 10, 20).split() == ('(col >= ? AND col <= ?)', [10, 20])
 
 
 def test_values():
-    q = t(f'!! INSERT INTO boo {VALUES(boo=10, foo=None)}')
-    assert render(q) == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
+    q = f'!! INSERT INTO boo {VALUES(boo=10, foo=None)}'
+    assert sqlf(q).split() == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
 
 
 def test_set():
-    q = t(f'!! UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}')
-    assert render(q) == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
+    q = f'!! UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}'
+    assert sqlf(q).split() == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
 
 
 def test_sql_ops():
     q = text('some') & t(f'!! {10}')
-    assert render(q) == ('(some AND ?)', [10])
+    assert q.split() == ('(some AND ?)', [10])
 
     q = text('some') | t(f'!! {10}')
-    assert render(q) == ('(some OR ?)', [10])
+    assert q.split() == ('(some OR ?)', [10])
 
     q = ~sql(t(f'!! {10}'))
-    assert render(q) == ('NOT ?', [10])
+    assert q.split() == ('NOT ?', [10])
 
-    assert render(~EMPTY) == ('', [])
+    assert (~EMPTY).split() == ('', [])

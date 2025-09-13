@@ -1,3 +1,3 @@
 from sqlbind_t import tfstring
 
-tfstring.init(['tests.'])
+tfstring.init(['tests.'], pytest=True)
