@@ -21,3 +21,6 @@ ignore = ["E731", "E402"]
 
 [tool.coverage.run]
 source = ["sqlbind_t"]
+
+[tool.coverage.report]
+fail_under = 100
