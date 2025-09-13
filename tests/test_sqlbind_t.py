@@ -3,12 +3,13 @@ from typing import Any
 from sqlbind_t import (
     EMPTY,
     SET,
-    SQL,
     VALUES,
     WHERE,
+    AnySQL,
     QMarkQueryParams,
     in_range,
     not_none,
+    sql,
     text,
 )
 from sqlbind_t.template import Interpolation
@@ -16,8 +17,8 @@ from sqlbind_t.template import t as tt
 from sqlbind_t.tfstring import t
 
 
-def render(sql: SQL) -> tuple[str, list[Any]]:
-    return QMarkQueryParams().render(sql)
+def render(q: AnySQL) -> tuple[str, list[Any]]:
+    return QMarkQueryParams().render(q)
 
 
 def test_repr():
@@ -38,8 +39,8 @@ def test_simple_tf_strings():
 
 
 def test_where():
-    sql = WHERE(some=not_none / 10, null=None, empty=not_none / None)
-    assert render(sql) == ('WHERE some = ? AND null IS NULL', [10])
+    q = WHERE(some=not_none / 10, null=None, empty=not_none / None)
+    assert render(q) == ('WHERE some = ? AND null IS NULL', [10])
 
     assert render(WHERE(EMPTY)) == ('', [])
 
@@ -52,21 +53,23 @@ def test_in_range():
 
 
 def test_values():
-    sql = t(f'!! INSERT INTO boo {VALUES(boo=10, foo=None)}')
-    assert render(sql) == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
+    q = t(f'!! INSERT INTO boo {VALUES(boo=10, foo=None)}')
+    assert render(q) == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
 
 
 def test_set():
-    sql = t(f'!! UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}')
-    assert render(sql) == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
+    q = t(f'!! UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}')
+    assert render(q) == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
 
 
 def test_sql_ops():
-    sql = text('some') & t(f'!! {10}')
-    assert render(sql) == ('(some AND ?)', [10])
+    q = text('some') & t(f'!! {10}')
+    assert render(q) == ('(some AND ?)', [10])
 
-    sql = text('some') | t(f'!! {10}')
-    assert render(sql) == ('(some OR ?)', [10])
+    q = text('some') | t(f'!! {10}')
+    assert render(q) == ('(some OR ?)', [10])
 
-    sql = ~SQL(t(f'!! {10}'))
-    assert render(sql) == ('NOT ?', [10])
+    q = ~sql(t(f'!! {10}'))
+    assert render(q) == ('NOT ?', [10])
+
+    assert render(~EMPTY) == ('', [])
