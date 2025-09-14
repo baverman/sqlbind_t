@@ -108,7 +108,12 @@ def text(expr: str) -> SQL:
 def sql(template: AnySQL) -> SQL:
     if isinstance(template, SQL):
         return template
-    return SQL(Interpolation(template))
+
+    for it in template:
+        if isinstance(it, Interpolation) and it.value is UNDEFINED:
+            return EMPTY
+
+    return SQL(*template)
 
 
 def AND(*fragments: AnySQL) -> SQL:
@@ -132,7 +137,7 @@ def join_fragments(
 
 
 def WHERE(*cond: AnySQL, **kwargs: object) -> SQL:
-    flist = list(cond) + [
+    flist = list(sql(it) for it in cond) + [
         SQL(f'{field} IS NULL') if value is None else SQL(f'{field} = ', Interpolation(value))
         for field, value in kwargs.items()
         if value is not UNDEFINED

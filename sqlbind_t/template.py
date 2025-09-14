@@ -28,6 +28,9 @@ class Template:
     def __bool__(self) -> bool:
         return bool(self._parts)
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({", ".join(map(repr, self))})'
+
 
 def parse_template(string: str) -> Template:
     root = ast.parse('f' + repr(string), mode='eval')

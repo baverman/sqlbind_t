@@ -31,11 +31,19 @@ def test_simple_tf_strings():
     assert p == [10]
 
 
-def test_where():
+def test_where_kwargs():
     q = WHERE(some=not_none / 10, null=None, empty=not_none / None)
     assert q.split() == ('WHERE some = ? AND null IS NULL', [10])
 
     assert sql(WHERE(EMPTY)).split() == ('', [])
+
+
+def test_where_args():
+    q = WHERE(f'!! f1 = {not_none/None}', f'!! f2 = {10}')
+    assert q
+    assert repr(q) == "Compound('WHERE ', Interpolation(SQL('f2 = ', Interpolation(10))))"
+
+    assert q.split() == ('WHERE f2 = ?', [10])
 
 
 def test_in_range():
