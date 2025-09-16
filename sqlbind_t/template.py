@@ -28,7 +28,7 @@ class Template:
     def __bool__(self) -> bool:
         return bool(self._parts)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__class__.__name__}({", ".join(map(repr, self))})'
 
 

@@ -1,20 +1,21 @@
 import ast
 from textwrap import dedent
+from typing import Any, Dict
 
 import pytest
 
 from sqlbind_t.tfstring import transform_fstrings
 
 
-def execute(source):
+def execute(source: str) -> Dict[str, Any]:
     new = transform_fstrings(ast.parse(source))
     code = compile(new, '<string>', 'exec')
-    ctx = {}
+    ctx: Dict[str, Any] = {}
     exec(code, ctx, ctx)
     return ctx
 
 
-def test_simple():
+def test_simple() -> None:
     ctx = execute(
         dedent(
             """\
@@ -30,7 +31,7 @@ def test_simple():
     assert p2.value == 'zoom'
 
 
-def test_type_check():
+def test_type_check() -> None:
     ctx = execute(
         dedent(
             """\

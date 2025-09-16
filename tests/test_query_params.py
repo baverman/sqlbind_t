@@ -2,7 +2,7 @@ import sqlbind_t.query_params as qp
 from sqlbind_t.tfstring import sql
 
 
-def test_query_params():
+def test_query_params() -> None:
     q = sql(f'!! SELECT {10}, {20}')
 
     assert q.split(qp.QMarkQueryParams()) == ('SELECT ?, ?', [10, 20])

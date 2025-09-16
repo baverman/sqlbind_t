@@ -183,7 +183,15 @@ class NotNone:
         return other
 
 
+class Truthy:
+    def __truediv__(self, other: object) -> object:
+        if not other:
+            return UNDEFINED
+        return other
+
+
 not_none = NotNone()
+truthy = Truthy()
 
 
 def _in_range(field: str, lop: str, left: object, rop: str, right: object) -> SQL:
@@ -199,3 +207,61 @@ def in_range(field: str, left: object, right: object) -> SQL:
 
 def in_crange(field: str, left: object, right: object) -> SQL:
     return _in_range(field, '>=', left, '<=', right)
+
+
+def op2(left: str, right: object) -> SQL:
+    if right is UNDEFINED:
+        return EMPTY
+    return SQL(left, Interpolation(right))
+
+
+class Expr:
+    def __init__(self, left: str = ''):
+        self._left = left
+
+    def __getattr__(self, name: str) -> 'Expr':
+        if self._left:
+            return Expr(f'{self._left}.{name}')
+        return Expr(name)
+
+    def __call__(self, name: str) -> 'Expr':
+        if self._left:
+            return Expr(f'{self._left}.{name}')
+        return Expr(name)
+
+    def __lt__(self, right: object) -> SQL:
+        return op2(f'{self._left} < ', right)
+
+    def __le__(self, right: object) -> SQL:
+        return op2(f'{self._left} <= ', right)
+
+    def __gt__(self, right: object) -> SQL:
+        return op2(f'{self._left} > ', right)
+
+    def __ge__(self, right: object) -> SQL:
+        return op2(f'{self._left} >= ', right)
+
+    def __eq__(self, right: object) -> SQL:  # type: ignore[override]
+        if right is None:
+            return SQL(f'{self._left} IS NULL')
+        return op2(f'{self._left} = ', right)
+
+    def __ne__(self, right: object) -> SQL:  # type: ignore[override]
+        if right is None:
+            return SQL(f'{self._left} IS NOT NULL')
+        return op2(f'{self._left} != ', right)
+
+    def __invert__(self) -> SQL:
+        return SQL('NOT ' + self._left)
+
+    # def IN(self, right: object) -> SQL:
+    #     return IN(self._left, right)
+    #
+    # def LIKE(self, template: str, right: object) -> SQL:
+    #     return LIKE(self._left, template, right)
+    #
+    # def ILIKE(self, template: str, right: object) -> SQL:
+    #     return ILIKE(self._left, template, right)
+
+
+E = Expr()
