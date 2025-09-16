@@ -32,9 +32,9 @@ class Template:
         return f'{self.__class__.__name__}({", ".join(map(repr, self))})'
 
 
-def parse_template(string: str) -> Template:
+def parse_template(string: str, *, level: int = 1) -> Template:
     root = ast.parse('f' + repr(string), mode='eval')
-    frame = sys._getframe(1)
+    frame = sys._getframe(level)
     values: List[Union[str, Interpolation]] = []
     for it in root.body.values:  # type: ignore[attr-defined]
         if type(it) is FormattedValue:
@@ -44,6 +44,3 @@ def parse_template(string: str) -> Template:
         else:
             values.append(it.value)
     return Template(*values)
-
-
-t = parse_template

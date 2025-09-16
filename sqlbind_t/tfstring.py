@@ -17,10 +17,8 @@ from ast import (
     parse,
 )
 from importlib.machinery import PathFinder
-from typing import Any, List, Union
+from typing import Any, List
 
-from . import SQL, AnySQL
-from . import sql as sql_orig
 from .template import Template
 
 PREFIX = '!! '
@@ -84,13 +82,6 @@ def check_template(arg: str) -> Template:
     raise RuntimeError(
         f't (check_template) accepts only a prefixed f-string like t(f"{PREFIX} ...")'
     )
-
-
-t = check_template
-
-
-def sql(template: Union[AnySQL, str]) -> SQL:
-    return sql_orig(check_template(template))  # type: ignore[arg-type]
 
 
 class TransformingLoader(importlib.abc.SourceLoader):

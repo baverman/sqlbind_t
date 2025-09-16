@@ -10,7 +10,8 @@ from typing import (
 )
 
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
-from .template import Interpolation, Template
+from .template import Interpolation, Template, parse_template
+from .tfstring import check_template
 
 UNDEFINED = object()
 
@@ -114,6 +115,14 @@ def sql(template: AnySQL) -> SQL:
             return EMPTY
 
     return SQL(*template)
+
+
+def sqls(template: str) -> SQL:
+    return sql(parse_template(template, level=2))
+
+
+def sqlf(template: Union[AnySQL, str]) -> SQL:
+    return sql(check_template(template))  # type: ignore[arg-type]
 
 
 def AND(*fragments: AnySQL) -> SQL:

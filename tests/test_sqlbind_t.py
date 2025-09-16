@@ -8,13 +8,13 @@ from sqlbind_t import (
     in_range,
     not_none,
     sql,
+    sqlf,
+    sqls,
     text,
     truthy,
 )
 from sqlbind_t.template import Interpolation
-from sqlbind_t.template import t as tt
-from sqlbind_t.tfstring import sql as sqlf
-from sqlbind_t.tfstring import t
+from sqlbind_t.tfstring import check_template as t
 
 
 def test_repr() -> None:
@@ -23,7 +23,7 @@ def test_repr() -> None:
 
 
 def test_simple() -> None:
-    s, p = sql(tt('SELECT * from {text("boo")} WHERE name = {10}')).split()
+    s, p = sqls('SELECT * from {text("boo")} WHERE name = {10}').split()
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 

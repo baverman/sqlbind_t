@@ -19,7 +19,7 @@ def test_simple() -> None:
     ctx = execute(
         dedent(
             """\
-                from sqlbind_t.tfstring import t
+                from sqlbind_t.tfstring import check_template as t
                 def boo(name):
                     return t(f'!! SELECT {name}')
             """
@@ -35,7 +35,7 @@ def test_type_check() -> None:
     ctx = execute(
         dedent(
             """\
-                from sqlbind_t.tfstring import t
+                from sqlbind_t.tfstring import check_template as t
                 def boo(name):
                     return t(f'SELECT {name}')
             """
