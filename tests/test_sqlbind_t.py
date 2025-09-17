@@ -97,3 +97,10 @@ def test_expr() -> None:
 
     assert (E('field + 10') < 1).split() == ('field + 10 < ?', [1])
     assert (val('"ugly name"') == 1).split() == ('val."ugly name" = ?', [1])
+
+
+def test_in() -> None:
+    val = E.val
+    assert val.IN([10, 20]).split() == ('val IN ?', [[10, 20]])
+    assert val.IN([]).split() == ('FALSE', [])
+    assert val.IN(not_none / None).split() == ('', [])

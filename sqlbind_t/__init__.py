@@ -1,22 +1,30 @@
-from typing import (
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    overload,
-)
+from collections.abc import Collection
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload
 
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, Template, parse_template
 from .tfstring import check_template
 
-UNDEFINED = object()
+
+class UndefinedType:
+    pass
+
 
 Part = Union[str, Interpolation]
 AnySQL = Union['SQL', Template]
+T = TypeVar('T')
+UNDEFINED = UndefinedType()
+
+
+class Dialect:
+    FALSE = 'FALSE'
+    LIKE_ESCAPE = '\\'
+    LIKE_CHARS = '%_'
+
+    def IN(self, op: 'DialectOp', params: 'QueryParams') -> str:
+        if op.value:
+            return f'{op.field} IN {params.compile(op.value)}'
+        return self.FALSE
 
 
 class SQL(Template):
@@ -47,21 +55,25 @@ class SQL(Template):
     @overload
     def split(self, params: ParamsT) -> Tuple[str, ParamsT]: ...
 
-    def split(self, params: Optional[ParamsT] = None) -> Tuple[str, ParamsT]:
+    def split(
+        self, params: Optional[ParamsT] = None, dialect: Dialect = Dialect()
+    ) -> Tuple[str, ParamsT]:
         lparams: ParamsT
         if params is None:
             lparams = QMarkQueryParams()  # type: ignore[assignment]
         else:
             lparams = params
-        return ''.join(self._walk(self, lparams)), lparams
+        return ''.join(self._walk(self, lparams, dialect)), lparams
 
-    def _walk(self, query: AnySQL, params: QueryParams) -> Iterator[str]:
+    def _walk(self, query: AnySQL, params: QueryParams, dialect: Dialect) -> Iterator[str]:
         for it in query:
             if type(it) is str:
                 yield it
             else:
                 if isinstance(it.value, Template):  # type: ignore[union-attr]
-                    yield from self._walk(it.value, params)  # type: ignore[union-attr]
+                    yield from self._walk(it.value, params, dialect)  # type: ignore[union-attr]
+                elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
+                    yield it.value.to_sql(params, dialect)  # type: ignore[union-attr]
                 else:
                     yield params.compile(it.value)  # type: ignore[union-attr]
 
@@ -186,14 +198,14 @@ def SET(**kwargs: object) -> SQL:
 
 
 class NotNone:
-    def __truediv__(self, other: object) -> object:
+    def __truediv__(self, other: Optional[T]) -> Union[T, UndefinedType]:
         if other is None:
             return UNDEFINED
         return other
 
 
 class Truthy:
-    def __truediv__(self, other: object) -> object:
+    def __truediv__(self, other: Optional[T]) -> Union[T, UndefinedType]:
         if not other:
             return UNDEFINED
         return other
@@ -222,6 +234,27 @@ def op2(left: str, right: object) -> SQL:
     if right is UNDEFINED:
         return EMPTY
     return SQL(left, Interpolation(right))
+
+
+class DialectOp:
+    method: str
+
+    def __init__(self, field: str, value: object):
+        self.field = field
+        self.value = value
+
+    def to_sql(self, params: QueryParams, dialect: Dialect) -> str:
+        return getattr(dialect, self.method)(self, params)  # type: ignore[no-any-return]
+
+
+class _INOp(DialectOp):
+    method = 'IN'
+
+
+def IN(field: str, value: Union[Collection[object], UndefinedType]) -> SQL:
+    if value is UNDEFINED:
+        return EMPTY
+    return SQL(Interpolation(_INOp(field, list(value))))  # type: ignore[arg-type]
 
 
 class Expr:
@@ -263,9 +296,9 @@ class Expr:
     def __invert__(self) -> SQL:
         return SQL('NOT ' + self._left)
 
-    # def IN(self, right: object) -> SQL:
-    #     return IN(self._left, right)
-    #
+    def IN(self, right: Union[Collection[object], UndefinedType]) -> SQL:
+        return IN(self._left, right)
+
     # def LIKE(self, template: str, right: object) -> SQL:
     #     return LIKE(self._left, template, right)
     #
