@@ -5,6 +5,7 @@ from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, Template, parse_template
 from .tfstring import check_template
 
+version = '0.1'
 
 class UndefinedType:
     pass

@@ -1,3 +1,6 @@
 __pycache__
 /.coverage
 /TODO
+/build
+/dist
+/*.egg-info/
