@@ -1,11 +1,23 @@
 from collections.abc import Collection
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload
+from typing import (
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, Template, parse_template
 from .tfstring import check_template
 
 version = '0.1'
+
 
 class UndefinedType:
     pass
@@ -22,7 +34,7 @@ class Dialect:
     LIKE_ESCAPE = '\\'
     LIKE_CHARS = '%_'
 
-    def IN(self, op: 'DialectOp', params: 'QueryParams') -> str:
+    def IN(self, op: 'DialectOp[Collection[object]]', params: 'QueryParams') -> str:
         if op.value:
             return f'{op.field} IN {params.compile(op.value)}'
         return self.FALSE
@@ -52,6 +64,9 @@ class SQL(Template):
 
     @overload
     def split(self) -> Tuple[str, QMarkQueryParams]: ...
+
+    @overload
+    def split(self, *, dialect: Dialect) -> Tuple[str, QMarkQueryParams]: ...
 
     @overload
     def split(self, params: ParamsT) -> Tuple[str, ParamsT]: ...
@@ -237,10 +252,10 @@ def op2(left: str, right: object) -> SQL:
     return SQL(left, Interpolation(right))
 
 
-class DialectOp:
+class DialectOp(Generic[T]):
     method: str
 
-    def __init__(self, field: str, value: object):
+    def __init__(self, field: str, value: T):
         self.field = field
         self.value = value
 
@@ -248,7 +263,7 @@ class DialectOp:
         return getattr(dialect, self.method)(self, params)  # type: ignore[no-any-return]
 
 
-class _INOp(DialectOp):
+class _INOp(DialectOp[Union[Collection[object]]]):
     method = 'IN'
 
 
