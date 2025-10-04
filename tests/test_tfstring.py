@@ -8,7 +8,7 @@ from sqlbind_t.tfstring import transform_fstrings
 
 
 def execute(source: str) -> Dict[str, Any]:
-    new = transform_fstrings(ast.parse(source))
+    new = transform_fstrings(ast.parse(source), '@')
     code = compile(new, '<string>', 'exec')
     ctx: Dict[str, Any] = {}
     exec(code, ctx, ctx)
@@ -21,7 +21,7 @@ def test_simple() -> None:
             """\
                 from sqlbind_t.tfstring import check_template as t
                 def boo(name):
-                    return t(f'!! SELECT {name}')
+                    return t(f'@SELECT {name}')
             """
         )
     )

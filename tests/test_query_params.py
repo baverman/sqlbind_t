@@ -3,7 +3,7 @@ from sqlbind_t import sqlf
 
 
 def test_query_params() -> None:
-    q = sqlf(f'!! SELECT {10}, {20}')
+    q = sqlf(f'@SELECT {10}, {20}')
 
     assert q.split(qp.QMarkQueryParams()) == ('SELECT ?, ?', [10, 20])
     assert q.split(qp.NumericQueryParams()) == ('SELECT :1, :2', [10, 20])

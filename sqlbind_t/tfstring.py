@@ -21,16 +21,17 @@ from typing import Any, List
 
 from .template import Template
 
-PREFIX = '!! '
 IMPORTED_CALL_NAME = '__sqlbind_t_template'
 IMPORTED_INTERPOLATE_NAME = '__sqlbind_t_interpolate'
 
 
 class FStringTransformer(NodeTransformer):
+    sigil: str
+
     def visit_JoinedStr(self, node: JoinedStr) -> AST:
-        if type(node.values[0]) is Constant and node.values[0].value.startswith(PREFIX):  # type: ignore[union-attr,arg-type]
+        if type(node.values[0]) is Constant and node.values[0].value.startswith(self.sigil):  # type: ignore[union-attr,arg-type]
             self.has_transform = True
-            node.values[0].value = node.values[0].value[len(PREFIX) :]  # type: ignore[index]
+            node.values[0].value = node.values[0].value[len(self.sigil) :]  # type: ignore[index]
             replace = []
             for value in node.values:
                 arg: AST
@@ -53,8 +54,9 @@ class FStringTransformer(NodeTransformer):
         return node
 
 
-def transform_fstrings(tree: Module) -> Module:
+def transform_fstrings(tree: Module, sigil: str) -> Module:
     transformer = FStringTransformer()
+    transformer.sigil = sigil
     new_tree: Module = transformer.visit(tree)
 
     if getattr(transformer, 'has_transform', None):
@@ -80,16 +82,23 @@ def check_template(arg: str) -> Template:
     if isinstance(arg, Template):
         return arg
     raise RuntimeError(
-        f't (check_template) accepts only a prefixed f-string like t(f"{PREFIX} ...")'
+        '(check_template) accepts only a prefixed f-string like sqlf(f"@SELECT ...")'
     )
 
 
 class TransformingLoader(importlib.abc.SourceLoader):
     def __init__(
-        self, fullname: str, path: str, *, rewrite_pytest: bool = False, pytest_hook: Any = None
+        self,
+        fullname: str,
+        path: str,
+        *,
+        sigil: str,
+        rewrite_pytest: bool = False,
+        pytest_hook: Any = None,
     ) -> None:
         self.fullname = fullname
         self.path = path
+        self.sigil = sigil
         self._rewrite_pytest = rewrite_pytest
         self._pytest_hook = pytest_hook
 
@@ -102,7 +111,7 @@ class TransformingLoader(importlib.abc.SourceLoader):
 
     def source_to_code(self, data, path, *, _optimize=-1):  # type: ignore[no-untyped-def,override]
         tree = parse(data, filename=path)
-        new_tree = transform_fstrings(tree)
+        new_tree = transform_fstrings(tree, self.sigil)
         if self._rewrite_pytest:
             from _pytest.assertion.rewrite import rewrite_asserts
 
@@ -117,8 +126,9 @@ class DummyState:
 
 
 class TransformingFinder(PathFinder):
-    def __init__(self, prefixes: List[str], *, pytest_hook: Any = None) -> None:
+    def __init__(self, prefixes: List[str], sigil: str, *, pytest_hook: Any = None) -> None:
         self._sqlbind_prefixes = prefixes
+        self._sigil = sigil
         self._pytest_hook = pytest_hook
 
     def find_spec(self, fullname, path, target=None):  # type: ignore[no-untyped-def,override]
@@ -131,6 +141,7 @@ class TransformingFinder(PathFinder):
                 spec.loader = TransformingLoader(
                     fullname,
                     spec.origin,
+                    sigil=self._sigil,
                     rewrite_pytest=rewrite_pytest,
                     pytest_hook=self._pytest_hook,
                 )
@@ -138,11 +149,11 @@ class TransformingFinder(PathFinder):
         return spec
 
 
-def init(prefixes: List[str], pytest: bool = False) -> None:
+def init(prefixes: List[str], pytest: bool = False, sigil: str = '@') -> None:
     pytest_hook = None
     if pytest:
         from _pytest.assertion.rewrite import AssertionRewritingHook
 
         pytest_hook = next(it for it in sys.meta_path if isinstance(it, AssertionRewritingHook))
 
-    sys.meta_path.insert(0, TransformingFinder(prefixes, pytest_hook=pytest_hook))
+    sys.meta_path.insert(0, TransformingFinder(prefixes, sigil, pytest_hook=pytest_hook))

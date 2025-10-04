@@ -32,7 +32,7 @@ def test_simple() -> None:
 
 
 def test_simple_tf_strings() -> None:
-    s, p = sqlf(f'!! SELECT * from {text("boo")} WHERE name = {10}').split()
+    s, p = sqlf(f'@SELECT * from {text("boo")} WHERE name = {10}').split()
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 
@@ -57,14 +57,14 @@ def test_where_kwargs() -> None:
 
 
 def test_where_args() -> None:
-    q = WHERE(sqlf(f'!! f1 = {not_none / None}'), sqlf(f'!! f2 = {10}'))
+    q = WHERE(sqlf(f'@f1 = {not_none / None}'), sqlf(f'@f2 = {10}'))
     assert q
     assert q.split() == ('WHERE f2 = ?', [10])
 
 
 @pytest.mark.skipif(HAS_TSTRINGS, reason='std template could have unstable repr')
 def test_repr() -> None:
-    q = WHERE(sqlf(f'!! f1 = {not_none / None}'), sqlf(f'!! f2 = {10}'))
+    q = WHERE(sqlf(f'@f1 = {not_none / None}'), sqlf(f'@f2 = {10}'))
     assert repr(q) == "Compound('WHERE ', Interpolation(SQL('f2 = ', Interpolation(10))))"
 
     assert repr(Interpolation(10)) == 'Interpolation(10)'
@@ -80,23 +80,23 @@ def test_in_range() -> None:
 
 
 def test_values() -> None:
-    q = f'!! INSERT INTO boo {VALUES(boo=10, foo=None)}'
+    q = f'@INSERT INTO boo {VALUES(boo=10, foo=None)}'
     assert sqlf(q).split() == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
 
 
 def test_set() -> None:
-    q = f'!! UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}'
+    q = f'@UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}'
     assert sqlf(q).split() == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
 
 
 def test_sql_ops() -> None:
-    q = text('some') & t(f'!! {10}')
+    q = text('some') & t(f'@{10}')
     assert q.split() == ('(some AND ?)', [10])
 
-    q = text('some') | t(f'!! {10}')
+    q = text('some') | t(f'@{10}')
     assert q.split() == ('(some OR ?)', [10])
 
-    q = ~sql(t(f'!! {10}'))
+    q = ~sql(t(f'@{10}'))
     assert q.split() == ('NOT ?', [10])
 
     assert (~EMPTY).split() == ('', [])

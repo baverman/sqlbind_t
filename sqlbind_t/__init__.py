@@ -385,10 +385,8 @@ def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
     expressions because it could easily lead to incorrect results in best case
     and DDoS in worst.
 
-    >>> q('tag LIKE {}', like_escape('my_tag') + '%')
-    'tag LIKE ?'
-    >>> q
-    ['my\\_tag%']
+    >>> like_escape('my_tag')
+    'my\\_tag'
 
     Note: LIKE and Expr.LIKE provides more convenient way to use it.
     """
