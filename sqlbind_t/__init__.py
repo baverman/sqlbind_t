@@ -234,8 +234,19 @@ class Truthy:
         return other
 
 
+class Condition:
+    def __init__(self, cond: object) -> None:
+        self._cond = bool(cond)
+
+    def __truediv__(self, other: T) -> Union[T, UndefinedType]:
+        if not self._cond:
+            return UNDEFINED
+        return other
+
+
 not_none = NotNone()
 truthy = Truthy()
+cond = Condition
 
 
 def _in_range(field: str, lop: str, left: object, rop: str, right: object) -> SQL:

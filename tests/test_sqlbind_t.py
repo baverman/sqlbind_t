@@ -6,9 +6,11 @@ from sqlbind_t import (
     EMPTY,
     HAS_TSTRINGS,
     SET,
+    UNDEFINED,
     VALUES,
     WHERE,
     E,
+    cond,
     in_crange,
     in_range,
     like_escape,
@@ -139,3 +141,10 @@ def test_like() -> None:
     tag.LIKE('{}%', 'my_tag').split() == ('tag LIKE ?', ['my\\_tag%'])
     tag.ILIKE('{}%', 'my_tag').split() == ('tag ILIKE ?', ['my\\_tag%'])
     tag.LIKE('{}%', not_none / None).split() == ('', [])
+
+
+def test_cond() -> None:
+    is_true = cond(True)
+    is_false = cond(False)
+    assert is_true / 10 == 10
+    assert is_false / 10 is UNDEFINED
