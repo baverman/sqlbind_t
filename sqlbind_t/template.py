@@ -1,24 +1,16 @@
 import ast
 import sys
 from ast import Expression, FormattedValue
-from typing import Iterator, List, Union
+from typing import TYPE_CHECKING, Iterator, List, Union
+
+from . import HAS_TSTRINGS
+
+TemplatePart = Union[str, 'Interpolation']
+
+__all__ = ['NTemplate', 'Template', 'Interpolation', 'parse_template']
 
 
-class Interpolation:
-    def __init__(self, value: object) -> None:
-        self.value = value
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-    def __repr__(self) -> str:
-        return f'Interpolation({self.value!r})'
-
-
-TemplatePart = Union[str, Interpolation]
-
-
-class Template:
+class NTemplate:
     def __init__(self, *parts: TemplatePart):
         self._parts = parts
 
@@ -30,6 +22,28 @@ class Template:
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({", ".join(map(repr, self))})'
+
+
+class NInterpolation:
+    def __init__(self, value: object) -> None:
+        self.value = value
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+    def __repr__(self) -> str:
+        return f'Interpolation({self.value!r})'
+
+
+if TYPE_CHECKING:
+    Template = NTemplate
+    Interpolation = NInterpolation
+else:
+    if HAS_TSTRINGS:  # pragma: no cover
+        from string.templatelib import Interpolation, Template
+    else:
+        Template = NTemplate
+        Interpolation = NInterpolation
 
 
 def parse_template(string: str, *, level: int = 1) -> Template:

@@ -1,5 +1,10 @@
+from textwrap import dedent
+
+import pytest
+
 from sqlbind_t import (
     EMPTY,
+    HAS_TSTRINGS,
     SET,
     VALUES,
     WHERE,
@@ -18,11 +23,6 @@ from sqlbind_t.template import Interpolation
 from sqlbind_t.tfstring import check_template as t
 
 
-def test_repr() -> None:
-    assert repr(Interpolation(10)) == 'Interpolation(10)'
-    assert str(Interpolation(10)) == '10'
-
-
 def test_simple() -> None:
     s, p = sqls('SELECT * from {text("boo")} WHERE name = {10}').split()
     assert s == 'SELECT * from boo WHERE name = ?'
@@ -35,6 +35,18 @@ def test_simple_tf_strings() -> None:
     assert p == [10]
 
 
+@pytest.mark.skipif(not HAS_TSTRINGS, reason='no t-strings')
+def test_tstrings() -> None:
+    code = """\
+        name = 'boo'
+        table = t'foo'
+        cond = sql(t'name = {name}')
+        q = sql(t'SELECT * FROM {table} WHERE {cond}')
+        assert q.split() == ('SELECT * FROM foo WHERE name = ?', ['boo']), q.split()
+    """
+    exec(dedent(code))
+
+
 def test_where_kwargs() -> None:
     q = WHERE(some=not_none / 10, null=None, empty=not_none / None)
     assert q.split() == ('WHERE some = ? AND null IS NULL', [10])
@@ -45,9 +57,16 @@ def test_where_kwargs() -> None:
 def test_where_args() -> None:
     q = WHERE(sqlf(f'!! f1 = {not_none / None}'), sqlf(f'!! f2 = {10}'))
     assert q
+    assert q.split() == ('WHERE f2 = ?', [10])
+
+
+@pytest.mark.skipif(HAS_TSTRINGS, reason='std template could have unstable repr')
+def test_repr() -> None:
+    q = WHERE(sqlf(f'!! f1 = {not_none / None}'), sqlf(f'!! f2 = {10}'))
     assert repr(q) == "Compound('WHERE ', Interpolation(SQL('f2 = ', Interpolation(10))))"
 
-    assert q.split() == ('WHERE f2 = ?', [10])
+    assert repr(Interpolation(10)) == 'Interpolation(10)'
+    assert str(Interpolation(10)) == '10'
 
 
 def test_in_range() -> None:

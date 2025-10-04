@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Collection
 from typing import (
     Dict,
@@ -12,8 +13,10 @@ from typing import (
     overload,
 )
 
+HAS_TSTRINGS: bool = sys.version_info[:2] >= (3, 14)
+
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
-from .template import Interpolation, Template, parse_template
+from .template import Interpolation, NTemplate, Template, parse_template
 from .tfstring import check_template
 
 version = '0.1'
@@ -44,7 +47,7 @@ class Dialect:
         return f'{op.field} {op.op} {params.compile(op.template.format(value))}'
 
 
-class SQL(Template):
+class SQL(NTemplate):
     def __init__(self, *parts: Part) -> None:
         self._parts = parts
 
@@ -90,7 +93,7 @@ class SQL(Template):
             if type(it) is str:
                 yield it
             else:
-                if isinstance(it.value, Template):  # type: ignore[union-attr]
+                if isinstance(it.value, (Template, SQL)):  # type: ignore[union-attr]
                     yield from self._walk(it.value, params, dialect)  # type: ignore[union-attr]
                 elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
                     yield it.value.to_sql(params, dialect)  # type: ignore[union-attr]
