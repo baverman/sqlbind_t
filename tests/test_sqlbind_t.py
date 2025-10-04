@@ -6,6 +6,7 @@ from sqlbind_t import (
     E,
     in_crange,
     in_range,
+    like_escape,
     not_none,
     sql,
     sqlf,
@@ -104,3 +105,18 @@ def test_in() -> None:
     assert val.IN([10, 20]).split() == ('val IN ?', [[10, 20]])
     assert val.IN([]).split() == ('FALSE', [])
     assert val.IN(not_none / None).split() == ('', [])
+
+
+def test_like_escape() -> None:
+    assert like_escape('boo') == 'boo'
+    assert like_escape('boo%') == 'boo\\%'
+    assert like_escape('boo_') == 'boo\\_'
+    assert like_escape('boo\\') == 'boo\\\\'
+    assert like_escape('%b\\oo_|', '|') == '|%b\\oo|_||'
+
+
+def test_like() -> None:
+    tag = E.tag
+    tag.LIKE('{}%', 'my_tag').split() == ('tag LIKE ?', ['my\\_tag%'])
+    tag.ILIKE('{}%', 'my_tag').split() == ('tag ILIKE ?', ['my\\_tag%'])
+    tag.LIKE('{}%', not_none / None).split() == ('', [])

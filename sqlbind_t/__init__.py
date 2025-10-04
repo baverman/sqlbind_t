@@ -34,10 +34,14 @@ class Dialect:
     LIKE_ESCAPE = '\\'
     LIKE_CHARS = '%_'
 
-    def IN(self, op: 'DialectOp[Collection[object]]', params: 'QueryParams') -> str:
+    def IN(self, op: 'IN_Op', params: QueryParams) -> str:
         if op.value:
             return f'{op.field} IN {params.compile(op.value)}'
         return self.FALSE
+
+    def LIKE(self, op: 'LIKE_Op', params: QueryParams) -> str:
+        value = like_escape(op.value, self.LIKE_ESCAPE, self.LIKE_CHARS)
+        return f'{op.field} {op.op} {params.compile(op.template.format(value))}'
 
 
 class SQL(Template):
@@ -263,14 +267,49 @@ class DialectOp(Generic[T]):
         return getattr(dialect, self.method)(self, params)  # type: ignore[no-any-return]
 
 
-class _INOp(DialectOp[Union[Collection[object]]]):
+class IN_Op(DialectOp[Union[Collection[object]]]):
     method = 'IN'
 
 
 def IN(field: str, value: Union[Collection[object], UndefinedType]) -> SQL:
     if value is UNDEFINED:
         return EMPTY
-    return SQL(Interpolation(_INOp(field, list(value))))  # type: ignore[arg-type]
+    return SQL(Interpolation(IN_Op(field, list(value))))  # type: ignore[arg-type]
+
+
+class LIKE_Op(DialectOp[str]):
+    method = 'LIKE'
+    op: str
+    template: str
+
+
+def LIKE(field: str, template: str, value: Union[str, UndefinedType], op: str = 'LIKE') -> SQL:
+    r"""Renders LIKE expression with escaped value.
+
+    template is a LIKE pattern with `{}` as a value placeholder, for example:
+
+    * `{}%`: startswith
+    * `%{}`: endswith
+    * `%{}%`: contains
+
+    >>> q.LIKE('tag', '{}%', 'my_tag')
+    'tag LIKE ?'
+    >>> q
+    ['my\\_tag%']
+    >>> q.LIKE('tag', '{}%', not_none/None)  # supports UNDEFINED values
+    ''
+    """
+    if value is UNDEFINED:
+        return EMPTY
+
+    dop = LIKE_Op(field, value)  # type: ignore[arg-type]
+    dop.op = op
+    dop.template = template
+    return SQL(Interpolation(dop))
+
+
+def ILIKE(field: str, template: str, value: Union[str, UndefinedType]) -> SQL:
+    return LIKE(field, template, value, 'ILIKE')
 
 
 class Expr:
@@ -315,11 +354,31 @@ class Expr:
     def IN(self, right: Union[Collection[object], UndefinedType]) -> SQL:
         return IN(self._left, right)
 
-    # def LIKE(self, template: str, right: object) -> SQL:
-    #     return LIKE(self._left, template, right)
-    #
-    # def ILIKE(self, template: str, right: object) -> SQL:
-    #     return ILIKE(self._left, template, right)
+    def LIKE(self, template: str, right: Union[str, UndefinedType]) -> SQL:
+        return LIKE(self._left, template, right)
+
+    def ILIKE(self, template: str, right: Union[str, UndefinedType]) -> SQL:
+        return ILIKE(self._left, template, right)
 
 
 E = Expr()
+
+
+def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
+    r"""Escapes special LIKE characters
+
+    In general application couldn't use untrusted input in LIKE
+    expressions because it could easily lead to incorrect results in best case
+    and DDoS in worst.
+
+    >>> q('tag LIKE {}', like_escape('my_tag') + '%')
+    'tag LIKE ?'
+    >>> q
+    ['my\\_tag%']
+
+    Note: LIKE and Expr.LIKE provides more convenient way to use it.
+    """
+    value = value.replace(escape, escape + escape)
+    for c in likechars:
+        value = value.replace(c, escape + c)
+    return value
