@@ -5,6 +5,7 @@ import pytest
 from sqlbind_t import (
     EMPTY,
     HAS_TSTRINGS,
+    IN,
     SET,
     UNDEFINED,
     VALUES,
@@ -20,19 +21,19 @@ from sqlbind_t import (
     text,
     truthy,
 )
-from sqlbind_t.dialect import like_escape
+from sqlbind_t.dialect import like_escape, unwrap
 from sqlbind_t.template import Interpolation
 from sqlbind_t.tfstring import check_template as t
 
 
 def test_simple() -> None:
-    s, p = sqls('SELECT * from {text("boo")} WHERE name = {10}').split()
+    s, p = unwrap(sqls('SELECT * from {text("boo")} WHERE name = {10}'))
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 
 
 def test_simple_tf_strings() -> None:
-    s, p = sqlf(f'@SELECT * from {text("boo")} WHERE name = {10}').split()
+    s, p = unwrap(sqlf(f'@SELECT * from {text("boo")} WHERE name = {10}'))
     assert s == 'SELECT * from boo WHERE name = ?'
     assert p == [10]
 
@@ -43,23 +44,23 @@ def test_tstrings() -> None:
         name = 'boo'
         table = t'foo'
         cond = sql(t'name = {name}')
-        q = sql(t'SELECT * FROM {table} WHERE {cond}')
-        assert q.split() == ('SELECT * FROM foo WHERE name = ?', ['boo']), q.split()
+        result = unwrap(t'SELECT * FROM {table} WHERE {cond}')
+        assert result == ('SELECT * FROM foo WHERE name = ?', ['boo']), result
     """
     exec(dedent(code))
 
 
 def test_where_kwargs() -> None:
     q = WHERE(some=not_none / 10, null=None, empty=not_none / None)
-    assert q.split() == ('WHERE some = ? AND null IS NULL', [10])
+    assert unwrap(q) == ('WHERE some = ? AND null IS NULL', [10])
 
-    assert sql(WHERE(EMPTY)).split() == ('', [])
+    assert unwrap(sql(WHERE(EMPTY))) == ('', [])
 
 
 def test_where_args() -> None:
     q = WHERE(sqlf(f'@f1 = {not_none / None}'), sqlf(f'@f2 = {10}'))
     assert q
-    assert q.split() == ('WHERE f2 = ?', [10])
+    assert unwrap(q) == ('WHERE f2 = ?', [10])
 
 
 @pytest.mark.skipif(HAS_TSTRINGS, reason='std template could have unstable repr')
@@ -72,60 +73,68 @@ def test_repr() -> None:
 
 
 def test_in_range() -> None:
-    assert in_range('col', 10, 20).split() == ('(col >= ? AND col < ?)', [10, 20])
-    assert in_range('col', 10, None).split() == ('col >= ?', [10])
-    assert in_range('col', None, 20).split() == ('col < ?', [20])
-    assert in_range('col', None, None).split() == ('', [])
-    assert in_crange('col', 10, 20).split() == ('(col >= ? AND col <= ?)', [10, 20])
+    col = E.col
+    assert unwrap(in_range(col, 10, 20)) == ('(col >= ? AND col < ?)', [10, 20])
+    assert unwrap(in_range(col, 10, None)) == ('col >= ?', [10])
+    assert unwrap(in_range(col, None, 20)) == ('col < ?', [20])
+    assert unwrap(in_range(col, None, None)) == ('', [])
+    assert unwrap(in_crange(col, 10, 20)) == ('(col >= ? AND col <= ?)', [10, 20])
+
+    assert unwrap(in_range(text('field + 20'), 10, 20)) == (
+        '(field + 20 >= ? AND field + 20 < ?)',
+        [10, 20],
+    )
 
 
 def test_values() -> None:
     q = f'@INSERT INTO boo {VALUES(boo=10, foo=None)}'
-    assert sqlf(q).split() == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
+    assert unwrap(sqlf(q)) == ('INSERT INTO boo (boo, foo) VALUES (?, ?)', [10, None])
 
 
 def test_set() -> None:
     q = f'@UPDATE boo {SET(boo=10, foo=None, bar=not_none / None)}'
-    assert sqlf(q).split() == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
+    assert unwrap(sqlf(q)) == ('UPDATE boo SET boo = ?, foo = ?', [10, None])
 
 
 def test_sql_ops() -> None:
     q = text('some') & t(f'@{10}')
-    assert q.split() == ('(some AND ?)', [10])
+    assert unwrap(q) == ('(some AND ?)', [10])
 
     q = text('some') | t(f'@{10}')
-    assert q.split() == ('(some OR ?)', [10])
+    assert unwrap(q) == ('(some OR ?)', [10])
 
     q = ~sql(t(f'@{10}'))
-    assert q.split() == ('NOT ?', [10])
+    assert unwrap(q) == ('NOT ?', [10])
 
-    assert (~EMPTY).split() == ('', [])
+    assert unwrap(~EMPTY) == ('', [])
 
 
 def test_expr() -> None:
     val = E.val
-    assert (val < 1).split() == ('val < ?', [1])
-    assert (val <= 1).split() == ('val <= ?', [1])
-    assert (val > 1).split() == ('val > ?', [1])
-    assert (val >= 1).split() == ('val >= ?', [1])
-    assert (val == 1).split() == ('val = ?', [1])
-    assert (val == None).split() == ('val IS NULL', [])  # noqa: E711
-    assert (val != truthy / 1).split() == ('val != ?', [1])
-    assert (val != None).split() == ('val IS NOT NULL', [])  # noqa: E711
-    assert (~val).split() == ('NOT val', [])
+    assert unwrap(val < 1) == ('val < ?', [1])
+    assert unwrap(val <= 1) == ('val <= ?', [1])
+    assert unwrap(val > 1) == ('val > ?', [1])
+    assert unwrap(val >= 1) == ('val >= ?', [1])
+    assert unwrap(val == 1) == ('val = ?', [1])
+    assert unwrap(val == None) == ('val IS NULL', [])  # noqa: E711
+    assert unwrap(val != truthy / 1) == ('val != ?', [1])
+    assert unwrap(val != None) == ('val IS NOT NULL', [])  # noqa: E711
+    assert unwrap(~val) == ('NOT val', [])
 
     assert (val == not_none / None) is EMPTY
     assert (val == truthy / 0) is EMPTY
 
-    assert (E('field + 10') < 1).split() == ('field + 10 < ?', [1])
-    assert (val('"ugly name"') == 1).split() == ('val."ugly name" = ?', [1])
+    assert unwrap(E('field + 10') < 1) == ('field + 10 < ?', [1])
+    assert unwrap(val('"ugly name"') == 1) == ('val."ugly name" = ?', [1])
 
 
 def test_in() -> None:
     val = E.val
-    assert val.IN([10, 20]).split() == ('val IN ?', [[10, 20]])
-    assert val.IN([]).split() == ('FALSE', [])
-    assert val.IN(not_none / None).split() == ('', [])
+    assert unwrap(val.IN([10, 20])) == ('val IN ?', [[10, 20]])
+    assert unwrap(val.IN([])) == ('FALSE', [])
+    assert unwrap(val.IN(not_none / None)) == ('', [])
+
+    assert unwrap(IN(sqlf(f'@field + {42}'), [10, 20])) == ('field + ? IN ?', [42, [10, 20]])
 
 
 def test_like_escape() -> None:
@@ -138,9 +147,9 @@ def test_like_escape() -> None:
 
 def test_like() -> None:
     tag = E.tag
-    tag.LIKE('{}%', 'my_tag').split() == ('tag LIKE ?', ['my\\_tag%'])
-    tag.ILIKE('{}%', 'my_tag').split() == ('tag ILIKE ?', ['my\\_tag%'])
-    tag.LIKE('{}%', not_none / None).split() == ('', [])
+    assert unwrap(tag.LIKE('{}%', 'my_tag')) == ('tag LIKE ?', ['my\\_tag%'])
+    assert unwrap(tag.ILIKE('{}%', 'my_tag')) == ('tag ILIKE ?', ['my\\_tag%'])
+    assert unwrap(tag.LIKE('{}%', not_none / None)) == ('', [])
 
 
 def test_cond() -> None:

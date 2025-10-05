@@ -9,13 +9,10 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
-    overload,
 )
 
 HAS_TSTRINGS: bool = sys.version_info[:2] >= (3, 14)
 
-from .dialect import Dialect, DialectOp, IN_Op, LIKE_Op
-from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, NTemplate, Template, parse_template
 from .tfstring import check_template
 
@@ -30,6 +27,7 @@ Part = Union[str, Interpolation]
 AnySQL = Union['SQL', Template]
 T = TypeVar('T')
 UNDEFINED = UndefinedType()
+SafeStr = Union['Expr', 'SQL', Template]
 
 
 class SQL(NTemplate):
@@ -53,37 +51,6 @@ class SQL(NTemplate):
 
     def __bool__(self) -> bool:
         return bool(len(self._parts))
-
-    @overload
-    def split(self) -> Tuple[str, QMarkQueryParams]: ...
-
-    @overload
-    def split(self, *, dialect: Dialect) -> Tuple[str, QMarkQueryParams]: ...
-
-    @overload
-    def split(self, params: ParamsT) -> Tuple[str, ParamsT]: ...
-
-    def split(
-        self, params: Optional[ParamsT] = None, dialect: Dialect = Dialect()
-    ) -> Tuple[str, ParamsT]:
-        lparams: ParamsT
-        if params is None:
-            lparams = QMarkQueryParams()  # type: ignore[assignment]
-        else:
-            lparams = params
-        return ''.join(self._walk(self, lparams, dialect)), lparams
-
-    def _walk(self, query: AnySQL, params: QueryParams, dialect: Dialect) -> Iterator[str]:
-        for it in query:
-            if type(it) is str:
-                yield it
-            else:
-                if isinstance(it.value, (Template, SQL)):  # type: ignore[union-attr]
-                    yield from self._walk(it.value, params, dialect)  # type: ignore[union-attr]
-                elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
-                    yield it.value.to_sql(params, dialect)  # type: ignore[union-attr]
-                else:
-                    yield params.compile(it.value)  # type: ignore[union-attr]
 
 
 class Compound(SQL):
@@ -234,18 +201,25 @@ truthy = Truthy()
 cond = Condition
 
 
-def _in_range(field: str, lop: str, left: object, rop: str, right: object) -> SQL:
+def unwrap_safe(value: SafeStr) -> Union[str, Interpolation]:
+    if isinstance(value, Expr):
+        return value._left
+    return Interpolation(value)
+
+
+def _in_range(field: SafeStr, lop: str, left: object, rop: str, right: object) -> SQL:
+    f = unwrap_safe(field)
     return AND(
-        SQL(f'{field} {lop} ', Interpolation(left)) if left is not None else EMPTY,
-        SQL(f'{field} {rop} ', Interpolation(right)) if right is not None else EMPTY,
+        SQL(f, f' {lop} ', Interpolation(left)) if left is not None else EMPTY,
+        SQL(f, f' {rop} ', Interpolation(right)) if right is not None else EMPTY,
     )
 
 
-def in_range(field: str, left: object, right: object) -> SQL:
+def in_range(field: SafeStr, left: object, right: object) -> SQL:
     return _in_range(field, '>=', left, '<', right)
 
 
-def in_crange(field: str, left: object, right: object) -> SQL:
+def in_crange(field: SafeStr, left: object, right: object) -> SQL:
     return _in_range(field, '>=', left, '<=', right)
 
 
@@ -255,13 +229,13 @@ def op2(left: str, right: object) -> SQL:
     return SQL(left, Interpolation(right))
 
 
-def IN(field: str, value: Union[Collection[object], UndefinedType]) -> SQL:
+def IN(field: SafeStr, value: Union[Collection[object], UndefinedType]) -> SQL:
     if value is UNDEFINED:
         return EMPTY
     return SQL(Interpolation(IN_Op(field, list(value))))  # type: ignore[arg-type]
 
 
-def LIKE(field: str, template: str, value: Union[str, UndefinedType], op: str = 'LIKE') -> SQL:
+def LIKE(field: SafeStr, template: str, value: Union[str, UndefinedType], op: str = 'LIKE') -> SQL:
     r"""Renders LIKE expression with escaped value.
 
     template is a LIKE pattern with `{}` as a value placeholder, for example:
@@ -286,7 +260,7 @@ def LIKE(field: str, template: str, value: Union[str, UndefinedType], op: str = 
     return SQL(Interpolation(dop))
 
 
-def ILIKE(field: str, template: str, value: Union[str, UndefinedType]) -> SQL:
+def ILIKE(field: SafeStr, template: str, value: Union[str, UndefinedType]) -> SQL:
     return LIKE(field, template, value, 'ILIKE')
 
 
@@ -330,13 +304,15 @@ class Expr:
         return SQL('NOT ' + self._left)
 
     def IN(self, right: Union[Collection[object], UndefinedType]) -> SQL:
-        return IN(self._left, right)
+        return IN(self, right)
 
     def LIKE(self, template: str, right: Union[str, UndefinedType]) -> SQL:
-        return LIKE(self._left, template, right)
+        return LIKE(self, template, right)
 
     def ILIKE(self, template: str, right: Union[str, UndefinedType]) -> SQL:
-        return ILIKE(self._left, template, right)
+        return ILIKE(self, template, right)
 
 
 E = Expr()
+
+from .dialect import IN_Op, LIKE_Op

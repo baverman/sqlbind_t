@@ -15,13 +15,14 @@ class Dialect(BaseDialect):
         if not values:
             return self.FALSE
 
+        f = self.unwrap_safe(op.field, params)
         if len(values) > self.IN_MAX_VALUES:
             # Trying to escape and assemble SQL manually to avoid too many
             # parameters exception
-            return f'{op.field} IN ({sqlite_value_list(values)})'
+            return f'{f} IN ({sqlite_value_list(values)})'
 
         mark_list = ', '.join(params.compile(it) for it in values)
-        return f'{op.field} IN ({mark_list})'
+        return f'{f} IN ({mark_list})'
 
 
 def sqlite_escape(val: Union[float, int, str]) -> str:
