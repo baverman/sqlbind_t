@@ -13,7 +13,6 @@ from sqlbind_t import (
     cond,
     in_crange,
     in_range,
-    like_escape,
     not_none,
     sql,
     sqlf,
@@ -21,6 +20,7 @@ from sqlbind_t import (
     text,
     truthy,
 )
+from sqlbind_t.dialect import like_escape
 from sqlbind_t.template import Interpolation
 from sqlbind_t.tfstring import check_template as t
 
