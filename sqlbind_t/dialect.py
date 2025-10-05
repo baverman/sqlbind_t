@@ -48,7 +48,7 @@ class Dialect:
     def unwrap_safe(self, value: SafeStr, params: QueryParams) -> str:
         if isinstance(value, Expr):
             return value._left
-        return unwrap(value, params=params, dialect=self)[0]  # type: ignore[call-overload,no-any-return]
+        return ''.join(_walk(value, params, self))
 
 
 def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
@@ -79,6 +79,10 @@ def unwrap(query: AnySQL, *, dialect: Dialect) -> Tuple[str, QMarkQueryParams]: 
 
 @overload
 def unwrap(query: AnySQL, params: ParamsT) -> Tuple[str, ParamsT]: ...
+
+
+@overload
+def unwrap(query: AnySQL, params: ParamsT, dialect: Dialect) -> Tuple[str, ParamsT]: ...
 
 
 def unwrap(
