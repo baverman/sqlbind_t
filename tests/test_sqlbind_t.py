@@ -126,6 +126,8 @@ def test_expr() -> None:
     assert unwrap(E('field + 10') < 1) == ('field + 10 < ?', [1])
     assert unwrap(val('"ugly name"') == 1) == ('val."ugly name" = ?', [1])
 
+    assert unwrap(sqlf(f'@SELECT * FROM {E.table}')) == ('SELECT * FROM table', [])
+
 
 def test_in() -> None:
     val = E.val

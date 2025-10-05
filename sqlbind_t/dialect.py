@@ -3,7 +3,7 @@ from typing import Generic, Iterator, Optional, Tuple, TypeVar, Union, overload
 
 from . import SQL, AnySQL, Expr, SafeStr
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
-from .template import Template
+from .template import Interpolation, Template
 
 T = TypeVar('T')
 
@@ -69,12 +69,15 @@ class Dialect:
             if type(it) is str:
                 yield it
             else:
-                if isinstance(it.value, (Template, SQL)):  # type: ignore[union-attr]
-                    yield from self._walk(it.value, params)  # type: ignore[union-attr]
-                elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
-                    yield it.value.to_sql(params, self)  # type: ignore[union-attr]
+                value: Interpolation = it.value  # type: ignore[union-attr,assignment]
+                if isinstance(value, (Template, SQL)):
+                    yield from self._walk(value, params)
+                elif isinstance(value, DialectOp):
+                    yield value.to_sql(params, self)
+                elif isinstance(value, Expr):
+                    yield value._left
                 else:
-                    yield params.compile(it.value)  # type: ignore[union-attr]
+                    yield params.compile(value)
 
 
 def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
