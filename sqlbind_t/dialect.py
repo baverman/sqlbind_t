@@ -48,7 +48,33 @@ class Dialect:
     def unwrap_safe(self, value: SafeStr, params: QueryParams) -> str:
         if isinstance(value, Expr):
             return value._left
-        return ''.join(_walk(value, params, self))
+        return ''.join(self._walk(value, params))
+
+    @overload
+    def unwrap(self, query: AnySQL) -> Tuple[str, QMarkQueryParams]: ...
+
+    @overload
+    def unwrap(self, query: AnySQL, params: ParamsT) -> Tuple[str, ParamsT]: ...
+
+    def unwrap(self, query: AnySQL, params: Optional[ParamsT] = None) -> Tuple[str, ParamsT]:
+        lparams: ParamsT
+        if params is None:
+            lparams = QMarkQueryParams()  # type: ignore[assignment]
+        else:
+            lparams = params
+        return ''.join(self._walk(query, lparams)), lparams
+
+    def _walk(self, query: AnySQL, params: QueryParams) -> Iterator[str]:
+        for it in query:
+            if type(it) is str:
+                yield it
+            else:
+                if isinstance(it.value, (Template, SQL)):  # type: ignore[union-attr]
+                    yield from self._walk(it.value, params)  # type: ignore[union-attr]
+                elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
+                    yield it.value.to_sql(params, self)  # type: ignore[union-attr]
+                else:
+                    yield params.compile(it.value)  # type: ignore[union-attr]
 
 
 def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
@@ -69,41 +95,4 @@ def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
     return value
 
 
-@overload
-def unwrap(query: AnySQL) -> Tuple[str, QMarkQueryParams]: ...
-
-
-@overload
-def unwrap(query: AnySQL, *, dialect: Dialect) -> Tuple[str, QMarkQueryParams]: ...
-
-
-@overload
-def unwrap(query: AnySQL, params: ParamsT) -> Tuple[str, ParamsT]: ...
-
-
-@overload
-def unwrap(query: AnySQL, params: ParamsT, dialect: Dialect) -> Tuple[str, ParamsT]: ...
-
-
-def unwrap(
-    query: AnySQL, params: Optional[ParamsT] = None, dialect: Dialect = Dialect()
-) -> Tuple[str, ParamsT]:
-    lparams: ParamsT
-    if params is None:
-        lparams = QMarkQueryParams()  # type: ignore[assignment]
-    else:
-        lparams = params
-    return ''.join(_walk(query, lparams, dialect)), lparams
-
-
-def _walk(query: AnySQL, params: QueryParams, dialect: Dialect) -> Iterator[str]:
-    for it in query:
-        if type(it) is str:
-            yield it
-        else:
-            if isinstance(it.value, (Template, SQL)):  # type: ignore[union-attr]
-                yield from _walk(it.value, params, dialect)  # type: ignore[union-attr]
-            elif isinstance(it.value, DialectOp):  # type: ignore[union-attr]
-                yield it.value.to_sql(params, dialect)  # type: ignore[union-attr]
-            else:
-                yield params.compile(it.value)  # type: ignore[union-attr]
+unwrap = Dialect().unwrap
