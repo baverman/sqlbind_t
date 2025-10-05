@@ -3,7 +3,7 @@ import sys
 from ast import Expression, FormattedValue
 from typing import TYPE_CHECKING, Iterator, List, Union
 
-from . import HAS_TSTRINGS
+HAS_TSTRINGS = sys.version_info[:2] >= (3, 14)
 
 TemplatePart = Union[str, 'Interpolation']
 

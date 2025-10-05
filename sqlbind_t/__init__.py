@@ -1,4 +1,3 @@
-import sys
 from collections.abc import Collection
 from typing import (
     Dict,
@@ -10,8 +9,6 @@ from typing import (
     TypeVar,
     Union,
 )
-
-HAS_TSTRINGS: bool = sys.version_info[:2] >= (3, 14)
 
 from .template import Interpolation, NTemplate, Template, parse_template
 from .tfstring import check_template

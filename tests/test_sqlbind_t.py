@@ -4,7 +4,6 @@ import pytest
 
 from sqlbind_t import (
     EMPTY,
-    HAS_TSTRINGS,
     IN,
     SET,
     UNDEFINED,
@@ -22,7 +21,7 @@ from sqlbind_t import (
     truthy,
 )
 from sqlbind_t.dialect import like_escape, unwrap
-from sqlbind_t.template import Interpolation
+from sqlbind_t.template import HAS_TSTRINGS, Interpolation
 from sqlbind_t.tfstring import check_template as t
 
 
