@@ -261,16 +261,19 @@ def ILIKE(field: SafeStr, template: str, value: Union[str, UndefinedType]) -> SQ
     return LIKE(field, template, value, 'ILIKE')
 
 
+SelfExpr = TypeVar('SelfExpr', bound='Expr')
+
+
 class Expr:
-    def __init__(self, left: str = ''):
+    def __init__(self, left: str = '') -> None:
         self._left = left
 
-    def __getattr__(self, name: str) -> 'Expr':
+    def __getattr__(self: SelfExpr, name: str) -> SelfExpr:
         if self._left:
-            return Expr(f'{self._left}.{name}')
+            return self.__class__(f'{self._left}.{name}')
         return self.__class__(name)
 
-    def __call__(self, name: str) -> 'Expr':
+    def __call__(self: SelfExpr, name: str) -> SelfExpr:
         if self._left:
             return self.__class__(f'{self._left}.{name}')
         return self.__class__(name)
