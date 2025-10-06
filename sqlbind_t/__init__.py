@@ -268,12 +268,12 @@ class Expr:
     def __getattr__(self, name: str) -> 'Expr':
         if self._left:
             return Expr(f'{self._left}.{name}')
-        return Expr(name)
+        return self.__class__(name)
 
     def __call__(self, name: str) -> 'Expr':
         if self._left:
-            return Expr(f'{self._left}.{name}')
-        return Expr(name)
+            return self.__class__(f'{self._left}.{name}')
+        return self.__class__(name)
 
     def __lt__(self, right: object) -> SQL:
         return op2(f'{self._left} < ', right)
