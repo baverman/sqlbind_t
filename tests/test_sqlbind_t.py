@@ -21,7 +21,7 @@ from sqlbind_t import (
     truthy,
 )
 from sqlbind_t.dialect import like_escape, unwrap
-from sqlbind_t.template import HAS_TSTRINGS, Interpolation
+from sqlbind_t.template import HAS_TSTRINGS, Interpolation, Template
 from sqlbind_t.tfstring import check_template as t
 
 
@@ -66,6 +66,9 @@ def test_where_args() -> None:
 def test_repr() -> None:
     q = WHERE(sqlf(f'@f1 = {not_none / None}'), sqlf(f'@f2 = {10}'))
     assert repr(q) == "Compound('WHERE ', Interpolation(SQL('f2 = ', Interpolation(10))))"
+
+    t = Template(*q)
+    assert repr(t) == "NTemplate('WHERE ', Interpolation(SQL('f2 = ', Interpolation(10))))"
 
     assert repr(Interpolation(10)) == 'Interpolation(10)'
     assert str(Interpolation(10)) == '10'

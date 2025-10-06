@@ -7,7 +7,7 @@ HAS_TSTRINGS = sys.version_info[:2] >= (3, 14)
 
 TemplatePart = Union[str, 'Interpolation']
 
-__all__ = ['NTemplate', 'Template', 'Interpolation', 'parse_template']
+__all__ = ['Template', 'Interpolation']
 
 
 class NTemplate:

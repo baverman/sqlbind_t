@@ -10,24 +10,25 @@ from typing import (
     Union,
 )
 
-from .template import Interpolation, NTemplate, Template, parse_template
+from .template import Interpolation, Template, parse_template
 from .tfstring import check_template
 
 version = '0.1'
+
+T = TypeVar('T')
+Part = Union[str, Interpolation]
+AnySQL = Union['SQL', Template]
+SafeStr = Union['Expr', AnySQL]
 
 
 class UndefinedType:
     pass
 
 
-Part = Union[str, Interpolation]
-AnySQL = Union['SQL', Template]
-T = TypeVar('T')
 UNDEFINED = UndefinedType()
-SafeStr = Union['Expr', 'SQL', Template]
 
 
-class SQL(NTemplate):
+class SQL:
     def __init__(self, *parts: Part) -> None:
         self._parts = parts
 
@@ -48,6 +49,9 @@ class SQL(NTemplate):
 
     def __bool__(self) -> bool:
         return bool(len(self._parts))
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({", ".join(map(repr, self))})'
 
 
 class Compound(SQL):
