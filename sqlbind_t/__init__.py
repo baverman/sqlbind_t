@@ -202,14 +202,14 @@ truthy = Truthy()
 cond = Condition
 
 
-def unwrap_safe(value: SafeStr) -> Union[str, Interpolation]:
+def safe_part(value: SafeStr) -> Part:
     if isinstance(value, Expr):
         return value._left
     return Interpolation(value)
 
 
 def _in_range(field: SafeStr, lop: str, left: object, rop: str, right: object) -> SQL:
-    f = unwrap_safe(field)
+    f = safe_part(field)
     return AND(
         SQL(f, f' {lop} ', Interpolation(left)) if left is not None else EMPTY,
         SQL(f, f' {rop} ', Interpolation(right)) if right is not None else EMPTY,

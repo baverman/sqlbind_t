@@ -15,7 +15,7 @@ class Dialect(BaseDialect):
         if not values:
             return self.FALSE
 
-        f = self.unwrap_safe(op.field, params)
+        f = self.safe_str(op.field, params)
         if len(values) > self.IN_MAX_VALUES:
             # Trying to escape and assemble SQL manually to avoid too many
             # parameters exception

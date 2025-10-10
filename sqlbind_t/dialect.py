@@ -36,16 +36,16 @@ class Dialect:
 
     def IN(self, op: IN_Op, params: QueryParams) -> str:
         if op.value:
-            f = self.unwrap_safe(op.field, params)
+            f = self.safe_str(op.field, params)
             return f'{f} IN {params.compile(op.value)}'
         return self.FALSE
 
     def LIKE(self, op: LIKE_Op, params: QueryParams) -> str:
-        f = self.unwrap_safe(op.field, params)
+        f = self.safe_str(op.field, params)
         value = like_escape(op.value, self.LIKE_ESCAPE, self.LIKE_CHARS)
         return f'{f} {op.op} {params.compile(op.template.format(value))}'
 
-    def unwrap_safe(self, value: SafeStr, params: QueryParams) -> str:
+    def safe_str(self, value: SafeStr, params: QueryParams) -> str:
         if isinstance(value, Expr):
             return value._left
         return ''.join(self._walk(value, params))
