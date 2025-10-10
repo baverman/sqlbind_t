@@ -1,4 +1,3 @@
-from collections.abc import Collection
 from typing import (
     Dict,
     Iterator,
@@ -10,6 +9,7 @@ from typing import (
     Union,
 )
 
+from .compat import Collection
 from .template import Interpolation, Template, parse_template
 from .tfstring import check_template
 

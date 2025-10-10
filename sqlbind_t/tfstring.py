@@ -3,7 +3,6 @@ import sys
 from ast import (
     AST,
     Call,
-    Constant,
     FormattedValue,
     ImportFrom,
     JoinedStr,
@@ -17,9 +16,15 @@ from ast import (
     parse,
 )
 from importlib.machinery import PathFinder
-from typing import Any, List
+from typing import Any, List, Optional
 
+from .compat import pyver
 from .template import Template
+
+if pyver < (3, 8):  # pragma: no cover
+    from ast import Str
+else:
+    from ast import Constant
 
 IMPORTED_CALL_NAME = '__sqlbind_t_template'
 IMPORTED_INTERPOLATE_NAME = '__sqlbind_t_interpolate'
@@ -29,9 +34,22 @@ class FStringTransformer(NodeTransformer):
     sigil: str
 
     def visit_JoinedStr(self, node: JoinedStr) -> AST:
-        if type(node.values[0]) is Constant and node.values[0].value.startswith(self.sigil):  # type: ignore[union-attr,arg-type]
+        first = node.values[0]
+        first_str: Optional[str] = None
+        if pyver < (3, 8):  # pragma: no cover
+            if type(first) is Str:
+                first_str = first.s  # type: ignore[assignment]
+        else:
+            if type(first) is Constant:
+                first_str = first.value  # type: ignore[assignment]
+
+        if first_str and first_str.startswith(self.sigil):
             self.has_transform = True
-            node.values[0].value = node.values[0].value[len(self.sigil) :]  # type: ignore[index]
+            cleaned_value = first_str[len(self.sigil) :]
+            if pyver < (3, 8):  # pragma: no cover
+                first.s = cleaned_value  # type: ignore[attr-defined]
+            else:
+                first.value = cleaned_value  # type: ignore[attr-defined]
             replace = []
             for value in node.values:
                 arg: AST

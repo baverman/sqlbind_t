@@ -3,6 +3,8 @@ import sys
 from ast import Expression, FormattedValue
 from typing import TYPE_CHECKING, Iterator, List, Union
 
+from .compat import pyver
+
 HAS_TSTRINGS = sys.version_info[:2] >= (3, 14)
 
 TemplatePart = Union[str, 'Interpolation']
@@ -56,5 +58,8 @@ def parse_template(string: str, *, level: int = 1) -> Template:
             value = eval(code, frame.f_globals, frame.f_locals)
             values.append(Interpolation(value))
         else:
-            values.append(it.value)
+            if pyver < (3, 8):  # pragma: no cover
+                values.append(it.s)
+            else:
+                values.append(it.value)
     return Template(*values)

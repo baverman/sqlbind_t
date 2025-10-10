@@ -1,7 +1,7 @@
-from collections.abc import Collection
 from typing import Generic, Iterator, Optional, Tuple, TypeVar, Union, overload
 
 from . import SQL, AnySQL, Expr, SafeStr
+from .compat import Collection
 from .query_params import ParamsT, QMarkQueryParams, QueryParams
 from .template import Interpolation, Template
 

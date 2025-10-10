@@ -1,9 +1,9 @@
-from collections.abc import Collection
 from typing import Union
 
-from sqlbind_t.dialect import Dialect as BaseDialect
-from sqlbind_t.dialect import IN_Op
-from sqlbind_t.query_params import QueryParams
+from .compat import Collection
+from .dialect import Dialect as BaseDialect
+from .dialect import IN_Op
+from .query_params import QueryParams
 
 
 class Dialect(BaseDialect):
