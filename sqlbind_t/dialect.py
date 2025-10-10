@@ -15,7 +15,7 @@ class DialectOp(Generic[T]):
         self.field = field
         self.value = value
 
-    def to_sql(self, params: QueryParams, dialect: 'Dialect') -> str:
+    def render(self, params: QueryParams, dialect: 'Dialect') -> str:
         return getattr(dialect, self.method)(self, params)  # type: ignore[no-any-return]
 
 
@@ -51,12 +51,12 @@ class Dialect:
         return ''.join(self._walk(value, params))
 
     @overload
-    def unwrap(self, query: AnySQL) -> Tuple[str, QMarkQueryParams]: ...
+    def render(self, query: AnySQL) -> Tuple[str, QMarkQueryParams]: ...
 
     @overload
-    def unwrap(self, query: AnySQL, params: ParamsT) -> Tuple[str, ParamsT]: ...
+    def render(self, query: AnySQL, params: ParamsT) -> Tuple[str, ParamsT]: ...
 
-    def unwrap(self, query: AnySQL, params: Optional[ParamsT] = None) -> Tuple[str, ParamsT]:
+    def render(self, query: AnySQL, params: Optional[ParamsT] = None) -> Tuple[str, ParamsT]:
         lparams: ParamsT
         if params is None:
             lparams = QMarkQueryParams()  # type: ignore[assignment]
@@ -73,7 +73,7 @@ class Dialect:
                 if isinstance(value, (Template, SQL)):
                     yield from self._walk(value, params)
                 elif isinstance(value, DialectOp):
-                    yield value.to_sql(params, self)
+                    yield value.render(params, self)
                 elif isinstance(value, Expr):
                     yield value._left
                 else:
@@ -98,4 +98,4 @@ def like_escape(value: str, escape: str = '\\', likechars: str = '%_') -> str:
     return value
 
 
-unwrap = Dialect().unwrap
+render = Dialect().render

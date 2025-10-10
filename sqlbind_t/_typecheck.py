@@ -1,17 +1,17 @@
 from typing_extensions import assert_type
 
 from . import SQL, WHERE, Expr
-from .dialect import unwrap
+from .dialect import render
 from .query_params import NumericQueryParams, QMarkQueryParams
 
 
 def test_return_type_for_default_split() -> None:
-    result = unwrap(SQL())
+    result = render(SQL())
     assert_type(result[1], QMarkQueryParams)
 
 
 def test_return_type_for_split() -> None:
-    result = unwrap(SQL(), NumericQueryParams())
+    result = render(SQL(), NumericQueryParams())
     assert_type(result[1], NumericQueryParams)
 
 
